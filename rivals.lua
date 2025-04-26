@@ -1,176 +1,158 @@
--- Rivals Ultimate by DeepSeek (Game ID: 17625359962)
+-- Rivals Ultimate (Coastified Edition) - Game ID: 17625359962
 if game.PlaceId ~= 17625359962 then return end
 
-local library = loadstring(game:HttpGet("https://raw.githubusercontent.com/wally-rblx/uwuware-ui/main/main.lua"))()
-local window = library:CreateWindow("Rivals Ultimate") do
-    window:SetTheme("Midnight")
-end
+local Lib = loadstring(game:HttpGet("https://raw.githubusercontent.com/laagginq/ui-libraries/main/coastified/src.lua"))()
+local Window = Lib:Window("Rivals Ultimate", "rivals_ultimate", Enum.KeyCode.RightControl)
 
-local tabs = {
-    Combat = window:AddTab("Combat"),
-    Visuals = window:AddTab("Visuals"),
-    Movement = window:AddTab("Movement"),
-    Misc = window:AddTab("Misc")
-}
-
--- Core variables
+-- Safe variables initialization
 local players = game:GetService("Players")
 local localPlayer = players.LocalPlayer
 local runService = game:GetService("RunService")
-local uis = game:GetService("UserInputService")
+local camera = workspace.CurrentCamera
 
--- Silent Aim
-local silentAim = {
-    Enabled = false,
-    HitChance = 100,
-    TargetPart = "Head",
-    FOV = 60,
-    TeamCheck = true
+-- Combat Tab
+local CombatTab = Window:Tab("Combat")
+
+-- Visuals Tab
+local VisualsTab = Window:Tab("Visuals")
+
+-- Movement Tab
+local MovementTab = Window:Tab("Movement")
+
+-- Weapon Tab
+local WeaponTab = Window:Tab("Weapons")
+
+-- Core features with memory optimization
+local features = {
+    SilentAim = {
+        Enabled = false,
+        HitChance = 100,
+        TargetPart = "Head",
+        FOV = 100,
+        TeamCheck = true
+    },
+    ESP = {
+        Enabled = false,
+        Boxes = true,
+        Names = true,
+        Health = false, -- Disabled by default for stability
+        TeamCheck = true,
+        Color = Color3.fromRGB(255, 50, 50)
+    },
+    Movement = {
+        Bhop = false,
+        Speed = 16,
+        SpeedEnabled = false
+    },
+    Weapons = {
+        RapidFire = false,
+        NoSpread = false,
+        InfiniteAmmo = false
+    }
 }
 
--- Trigger Bot
-local triggerBot = {
-    Enabled = false,
-    Delay = 0.1,
-    AutoFire = false
-}
+-- Lightweight ESP system
+local espDrawings = {}
 
--- ESP
-local esp = {
-    Enabled = false,
-    Boxes = true,
-    Names = true,
-    Health = true,
-    TeamCheck = true,
-    Color = Color3.fromRGB(255, 0, 0)
-}
-
--- Weapon Mods
-local weaponMods = {
-    RapidFire = false,
-    NoSpread = false,
-    NoRecoil = false,
-    InstantReload = false,
-    InfiniteAmmo = false
-}
-
--- Movement
-local movement = {
-    Bhop = false,
-    Speed = 16,
-    InfiniteJump = false,
-    Noclip = false
-}
-
--- Misc
-local misc = {
-    ForceHit = false,
-    NoFlash = false,
-    HitSounds = true,
-    KillSay = false
-}
-
--- Drawing setup
-local drawings = {}
-local function createEsp(player)
-    drawings[player] = {
+local function createESP(player)
+    espDrawings[player] = {
         Box = Drawing.new("Square"),
-        Name = Drawing.new("Text"),
-        HealthBar = Drawing.new("Line"),
-        HealthText = Drawing.new("Text")
+        Name = Drawing.new("Text")
     }
     
-    for _, drawing in pairs(drawings[player]) do
+    -- Configure drawings
+    for _, drawing in pairs(espDrawings[player]) do
         drawing.Visible = false
+        drawing.ZIndex = 1
     end
+    
+    espDrawings[player].Name.Size = 14
+    espDrawings[player].Name.Center = true
 end
 
-local function updateEsp()
-    for player, drawing in pairs(drawings) do
+local function updateESP()
+    for player, drawings in pairs(espDrawings) do
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local hrp = player.Character.HumanoidRootPart
             local head = player.Character:FindFirstChild("Head")
-            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
             
             if head then
-                local pos, onScreen = workspace.CurrentCamera:WorldToViewportPoint(hrp.Position)
+                local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
                 
                 if onScreen then
-                    local size = (workspace.CurrentCamera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0)).Y - workspace.CurrentCamera:WorldToViewportPoint(hrp.Position + Vector3.new(0,2.5,0)).Y)/2
+                    local size = (camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0)).Y - camera:WorldToViewportPoint(hrp.Position + Vector3.new(0,2.5,0)).Y)/2
                     local width = size * 1.5
                     
                     -- Box ESP
-                    if esp.Boxes then
-                        drawing.Box.Size = Vector2.new(width, size*2)
-                        drawing.Box.Position = Vector2.new(pos.X - width/2, pos.Y - size)
-                        drawing.Box.Color = esp.Color
-                        drawing.Box.Thickness = 1
-                        drawing.Box.Visible = esp.Enabled
+                    if features.ESP.Boxes then
+                        drawings.Box.Size = Vector2.new(width, size*2)
+                        drawings.Box.Position = Vector2.new(pos.X - width/2, pos.Y - size)
+                        drawings.Box.Color = features.ESP.Color
+                        drawings.Box.Thickness = 1
+                        drawings.Box.Visible = features.ESP.Enabled
                     else
-                        drawing.Box.Visible = false
+                        drawings.Box.Visible = false
                     end
                     
                     -- Name ESP
-                    if esp.Names then
-                        drawing.Name.Position = Vector2.new(pos.X, pos.Y - size - 20)
-                        drawing.Name.Text = player.Name
-                        drawing.Name.Color = esp.Color
-                        drawing.Name.Visible = esp.Enabled
+                    if features.ESP.Names then
+                        drawings.Name.Position = Vector2.new(pos.X, pos.Y - size - 20)
+                        drawings.Name.Text = player.Name
+                        drawings.Name.Color = features.ESP.Color
+                        drawings.Name.Visible = features.ESP.Enabled
                     else
-                        drawing.Name.Visible = false
-                    end
-                    
-                    -- Health ESP
-                    if esp.Health and humanoid then
-                        local health = humanoid.Health / humanoid.MaxHealth
-                        local barLength = size * 2 * health
-                        
-                        drawing.HealthBar.From = Vector2.new(pos.X - width/2 - 6, pos.Y + size)
-                        drawing.HealthBar.To = Vector2.new(pos.X - width/2 - 6, pos.Y + size - barLength)
-                        drawing.HealthBar.Color = Color3.fromRGB(0, 255, 0)
-                        drawing.HealthBar.Thickness = 2
-                        drawing.HealthBar.Visible = esp.Enabled
-                        
-                        drawing.HealthText.Position = Vector2.new(pos.X - width/2 - 6, pos.Y + size + 5)
-                        drawing.HealthText.Text = tostring(math.floor(humanoid.Health))
-                        drawing.HealthText.Color = Color3.fromRGB(255, 255, 255)
-                        drawing.HealthText.Visible = esp.Enabled
-                    else
-                        drawing.HealthBar.Visible = false
-                        drawing.HealthText.Visible = false
+                        drawings.Name.Visible = false
                     end
                 else
-                    for _, d in pairs(drawing) do
-                        d.Visible = false
-                    end
+                    drawings.Box.Visible = false
+                    drawings.Name.Visible = false
                 end
             end
         else
-            for _, d in pairs(drawing) do
-                d.Visible = false
-            end
+            drawings.Box.Visible = false
+            drawings.Name.Visible = false
         end
     end
 end
 
--- Silent Aim Calculation
+-- Initialize ESP for all players
+for _, player in ipairs(players:GetPlayers()) do
+    if player ~= localPlayer then
+        createESP(player)
+    end
+end
+
+players.PlayerAdded:Connect(function(player)
+    createESP(player)
+end)
+
+players.PlayerRemoving:Connect(function(player)
+    if espDrawings[player] then
+        for _, drawing in pairs(espDrawings[player]) do
+            drawing:Remove()
+        end
+        espDrawings[player] = nil
+    end
+end)
+
+-- Silent Aim functionality
 local function getClosestTarget()
-    if not silentAim.Enabled then return nil end
+    if not features.SilentAim.Enabled then return nil end
     
-    local closestPlayer, closestDistance = nil, silentAim.FOV
-    local camera = workspace.CurrentCamera
+    local closestPlayer, closestDistance = nil, features.SilentAim.FOV
+    local localTeam = localPlayer.Team
     
     for _, player in pairs(players:GetPlayers()) do
         if player ~= localPlayer and player.Character then
-            if silentAim.TeamCheck and player.Team == localPlayer.Team then continue end
+            if features.SilentAim.TeamCheck and player.Team == localTeam then continue end
             
-            local part = player.Character:FindFirstChild(silentAim.TargetPart)
+            local part = player.Character:FindFirstChild(features.SilentAim.TargetPart)
             if part then
                 local pos, onScreen = camera:WorldToViewportPoint(part.Position)
                 if onScreen then
                     local distance = (Vector2.new(pos.X, pos.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
                     
-                    if distance < closestDistance then
+                    if distance < closestDistance and math.random(1, 100) <= features.SilentAim.HitChance then
                         closestDistance = distance
                         closestPlayer = player
                     end
@@ -182,321 +164,158 @@ local function getClosestTarget()
     return closestPlayer
 end
 
--- Weapon Modification
-local function modifyWeapon(tool)
-    if not tool:IsA("Tool") then return end
-    
-    if weaponMods.RapidFire and tool:FindFirstChild("FireRate") then
-        tool.FireRate.Value = 0.05
-    end
-    
-    if weaponMods.NoSpread and tool:FindFirstChild("Spread") then
-        tool.Spread.Value = 0
-    end
-    
-    if weaponMods.NoRecoil and tool:FindFirstChild("Recoil") then
-        tool.Recoil.Value = 0
-    end
-    
-    if weaponMods.InstantReload and tool:FindFirstChild("ReloadTime") then
-        tool.ReloadTime.Value = 0
-    end
-    
-    if weaponMods.InfiniteAmmo then
-        if tool:FindFirstChild("Ammo") then tool.Ammo.Value = 999 end
-        if tool:FindFirstChild("Clip") then tool.Clip.Value = 999 end
-    end
-end
-
--- Force Hit
-local function setupForceHit()
-    if not misc.ForceHit then return end
-    
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
-    
-    local oldNamecall = mt.__namecall
-    mt.__namecall = newcclosure(function(self, ...)
-        local args = {...}
-        if getnamecallmethod() == "FireServer" and tostring(self) == "HitPart" then
-            args[2] = 100 -- Max damage
-            return oldNamecall(self, unpack(args))
-        end
-        return oldNamecall(self, ...)
-    end)
-end
-
--- Bunny Hop
-local function bhop()
-    if not movement.Bhop then return end
-    
+-- Weapon modifications
+local function modifyWeapons()
     local character = localPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid and humanoid.FloorMaterial ~= Enum.Material.Air then
-            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
-    end
-end
-
--- Speed Hack
-local function speedHack()
-    local character = localPlayer.Character
-    if character then
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if humanoid then
-            humanoid.WalkSpeed = movement.Speed
-        end
-    end
-end
-
--- Infinite Jump
-local function infiniteJump()
-    if movement.InfiniteJump then
-        uis.JumpRequest:Connect(function()
-            local character = localPlayer.Character
-            if character then
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
+    if not character then return end
+    
+    for _, tool in pairs(character:GetChildren()) do
+        if tool:IsA("Tool") then
+            -- Rapid Fire
+            if features.Weapons.RapidFire and tool:FindFirstChild("FireRate") then
+                tool.FireRate.Value = 0.05
             end
-        end)
-    end
-end
-
--- Noclip
-local function noclip()
-    if not movement.Noclip then return end
-    
-    local character = localPlayer.Character
-    if character then
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
+            
+            -- No Spread
+            if features.Weapons.NoSpread and tool:FindFirstChild("Spread") then
+                tool.Spread.Value = 0
+            end
+            
+            -- Infinite Ammo
+            if features.Weapons.InfiniteAmmo then
+                if tool:FindFirstChild("Ammo") then tool.Ammo.Value = 999 end
+                if tool:FindFirstChild("Clip") then tool.Clip.Value = 999 end
             end
         end
     end
 end
 
--- No Flash
-local function noFlash()
-    if not misc.NoFlash then return end
+-- Movement
+local function handleMovement()
+    local character = localPlayer.Character
+    if not character then return end
     
-    for _, effect in pairs(game:GetService("Lighting"):GetChildren()) do
-        if effect.Name == "FlashEffect" then
-            effect:Destroy()
-        end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    -- Speed
+    if features.Movement.SpeedEnabled then
+        humanoid.WalkSpeed = features.Movement.Speed
+    else
+        humanoid.WalkSpeed = 16
+    end
+    
+    -- Bhop
+    if features.Movement.Bhop and humanoid.FloorMaterial ~= Enum.Material.Air then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end
-
--- Hit Sounds
-local function playHitSound()
-    if not misc.HitSounds then return end
-    
-    local sound = Instance.new("Sound")
-    sound.SoundId = "rbxassetid://131233123"
-    sound.Parent = workspace
-    sound:Play()
-    sound.Ended:Connect(function()
-        sound:Destroy()
-    end)
-end
-
--- Initialize
-for _, player in pairs(players:GetPlayers()) do
-    createEsp(player)
-end
-
-players.PlayerAdded:Connect(function(player)
-    createEsp(player)
-end)
-
-players.PlayerRemoving:Connect(function(player)
-    if drawings[player] then
-        for _, drawing in pairs(drawings[player]) do
-            drawing:Remove()
-        end
-        drawings[player] = nil
-    end
-end)
-
-localPlayer.CharacterAdded:Connect(function(character)
-    character:WaitForChild("Humanoid")
-    speedHack()
-    
-    if weaponMods.RapidFire or weaponMods.NoSpread or weaponMods.NoRecoil or weaponMods.InstantReload or weaponMods.InfiniteAmmo then
-        for _, tool in pairs(character:GetChildren()) do
-            modifyWeapon(tool)
-        end
-        
-        character.ChildAdded:Connect(function(tool)
-            modifyWeapon(tool)
-        end)
-    end
-end)
-
-setupForceHit()
-infiniteJump()
 
 -- Main loop
-runService.Stepped:Connect(function()
+runService.Heartbeat:Connect(function()
     -- ESP
-    if esp.Enabled then
-        updateEsp()
+    if features.ESP.Enabled then
+        updateESP()
     else
-        for _, playerDrawing in pairs(drawings) do
-            for _, drawing in pairs(playerDrawing) do
-                drawing.Visible = false
-            end
+        for _, drawings in pairs(espDrawings) do
+            drawings.Box.Visible = false
+            drawings.Name.Visible = false
         end
     end
     
     -- Movement
-    bhop()
-    speedHack()
-    noclip()
+    handleMovement()
     
-    -- Misc
-    noFlash()
+    -- Weapons
+    modifyWeapons()
 end)
 
 -- Combat Tab
-tabs.Combat:AddToggle("Silent Aim", silentAim.Enabled, function(state)
-    silentAim.Enabled = state
+CombatTab:Toggle("Silent Aim", function(state)
+    features.SilentAim.Enabled = state
 end)
 
-tabs.Combat:AddSlider("Hit Chance", silentAim.HitChance, 1, 100, function(value)
-    silentAim.HitChance = value
+CombatTab:Slider("Hit Chance", 1, 100, 100, function(value)
+    features.SilentAim.HitChance = value
 end)
 
-tabs.Combat:AddDropdown("Target Part", silentAim.TargetPart, {"Head", "HumanoidRootPart", "UpperTorso"}, function(part)
-    silentAim.TargetPart = part
+CombatTab:Dropdown("Target Part", {"Head", "HumanoidRootPart", "UpperTorso"}, function(part)
+    features.SilentAim.TargetPart = part
 end)
 
-tabs.Combat:AddSlider("FOV", silentAim.FOV, 1, 360, function(value)
-    silentAim.FOV = value
+CombatTab:Slider("FOV", 10, 360, 100, function(value)
+    features.SilentAim.FOV = value
 end)
 
-tabs.Combat:AddToggle("Trigger Bot", triggerBot.Enabled, function(state)
-    triggerBot.Enabled = state
-end)
-
-tabs.Combat:AddSlider("Trigger Delay", triggerBot.Delay, 0, 0.5, function(value)
-    triggerBot.Delay = value
-end)
-
-tabs.Combat:AddToggle("Force Hit", misc.ForceHit, function(state)
-    misc.ForceHit = state
-    setupForceHit()
-end)
-
--- Weapon Tab
-tabs.Combat:AddToggle("Rapid Fire", weaponMods.RapidFire, function(state)
-    weaponMods.RapidFire = state
-    if localPlayer.Character then
-        for _, tool in pairs(localPlayer.Character:GetChildren()) do
-            modifyWeapon(tool)
-        end
-    end
-end)
-
-tabs.Combat:AddToggle("No Spread", weaponMods.NoSpread, function(state)
-    weaponMods.NoSpread = state
-    if localPlayer.Character then
-        for _, tool in pairs(localPlayer.Character:GetChildren()) do
-            modifyWeapon(tool)
-        end
-    end
-end)
-
-tabs.Combat:AddToggle("No Recoil", weaponMods.NoRecoil, function(state)
-    weaponMods.NoRecoil = state
-    if localPlayer.Character then
-        for _, tool in pairs(localPlayer.Character:GetChildren()) do
-            modifyWeapon(tool)
-        end
-    end
-end)
-
-tabs.Combat:AddToggle("Instant Reload", weaponMods.InstantReload, function(state)
-    weaponMods.InstantReload = state
-    if localPlayer.Character then
-        for _, tool in pairs(localPlayer.Character:GetChildren()) do
-            modifyWeapon(tool)
-        end
-    end
-end)
-
-tabs.Combat:AddToggle("Infinite Ammo", weaponMods.InfiniteAmmo, function(state)
-    weaponMods.InfiniteAmmo = state
-    if localPlayer.Character then
-        for _, tool in pairs(localPlayer.Character:GetChildren()) do
-            modifyWeapon(tool)
-        end
-    end
-end)
-
--- Movement Tab
-tabs.Movement:AddToggle("Bunny Hop", movement.Bhop, function(state)
-    movement.Bhop = state
-end)
-
-tabs.Movement:AddSlider("Speed", movement.Speed, 16, 100, function(value)
-    movement.Speed = value
-    speedHack()
-end)
-
-tabs.Movement:AddToggle("Infinite Jump", movement.InfiniteJump, function(state)
-    movement.InfiniteJump = state
-    infiniteJump()
-end)
-
-tabs.Movement:AddToggle("Noclip", movement.Noclip, function(state)
-    movement.Noclip = state
+CombatTab:Toggle("Team Check", function(state)
+    features.SilentAim.TeamCheck = state
 end)
 
 -- Visuals Tab
-tabs.Visuals:AddToggle("ESP", esp.Enabled, function(state)
-    esp.Enabled = state
+VisualsTab:Toggle("ESP", function(state)
+    features.ESP.Enabled = state
 end)
 
-tabs.Visuals:AddToggle("Boxes", esp.Boxes, function(state)
-    esp.Boxes = state
+VisualsTab:Toggle("Boxes", function(state)
+    features.ESP.Boxes = state
 end)
 
-tabs.Visuals:AddToggle("Names", esp.Names, function(state)
-    esp.Names = state
+VisualsTab:Toggle("Names", function(state)
+    features.ESP.Names = state
 end)
 
-tabs.Visuals:AddToggle("Health", esp.Health, function(state)
-    esp.Health = state
+VisualsTab:Toggle("Team Check", function(state)
+    features.ESP.TeamCheck = state
 end)
 
-tabs.Visuals:AddToggle("Team Check", esp.TeamCheck, function(state)
-    esp.TeamCheck = state
+VisualsTab:Colorpicker("ESP Color", Color3.fromRGB(255, 50, 50), function(color)
+    features.ESP.Color = color
 end)
 
-tabs.Visuals:AddColorPicker("ESP Color", esp.Color, function(color)
-    esp.Color = color
+-- Movement Tab
+MovementTab:Toggle("Bunny Hop", function(state)
+    features.Movement.Bhop = state
 end)
 
--- Misc Tab
-tabs.Misc:AddToggle("No Flash", misc.NoFlash, function(state)
-    misc.NoFlash = state
+MovementTab:Toggle("Speed", function(state)
+    features.Movement.SpeedEnabled = state
 end)
 
-tabs.Misc:AddToggle("Hit Sounds", misc.HitSounds, function(state)
-    misc.HitSounds = state
+MovementTab:Slider("Speed Value", 16, 100, 16, function(value)
+    features.Movement.Speed = value
 end)
 
-tabs.Misc:AddToggle("Kill Say", misc.KillSay, function(state)
-    misc.KillSay = state
+-- Weapon Tab
+WeaponTab:Toggle("Rapid Fire", function(state)
+    features.Weapons.RapidFire = state
+    modifyWeapons()
 end)
 
--- Notify
-game.StarterGui:SetCore("SendNotification", {
+WeaponTab:Toggle("No Spread", function(state)
+    features.Weapons.NoSpread = state
+    modifyWeapons()
+end)
+
+WeaponTab:Toggle("Infinite Ammo", function(state)
+    features.Weapons.InfiniteAmmo = state
+    modifyWeapons()
+end)
+
+-- Initialize weapon mods when character spawns
+localPlayer.CharacterAdded:Connect(function(character)
+    wait(1) -- Wait for tools to load
+    modifyWeapons()
+    
+    character.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") then
+            modifyWeapons()
+        end
+    end)
+end)
+
+-- Initial notification
+game:GetService("StarterGui"):SetCore("SendNotification", {
     Title = "Rivals Ultimate",
-    Text = "Successfully loaded!",
+    Text = "Successfully loaded! Press RightControl",
     Duration = 5
 })
